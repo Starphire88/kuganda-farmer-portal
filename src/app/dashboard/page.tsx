@@ -4,19 +4,51 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
+type Alert = {
+  id: string
+  message: string
+  type: string
+  is_read: boolean
+  created_at: string
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  const [alerts, setAlerts] = useState<Alert[]>([
+    { id: '1', message: 'Payment of UGX 700,000 due in 19 days', type: 'warning', is_read: false, created_at: '' },
+    { id: '2', message: 'Your loan was disbursed on 1 Jan 2026', type: 'info', is_read: false, created_at: '' },
+  ])
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-      } else {
-        setUser(user)
-      }
+      if (!user) { router.push('/login'); return }
+      setUser(user)
+
+      // Load existing alerts from Supabase
+      const { data } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('farmer_id', user.id)
+        .order('created_at', { ascending: false })
+      if (data && data.length > 0) setAlerts(data)
+
+      // Subscribe to new alerts in real time
+      const channel = supabase
+        .channel('alerts-channel')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'alerts',
+          filter: `farmer_id=eq.${user.id}`,
+        }, (payload) => {
+          setAlerts((prev) => [payload.new as Alert, ...prev])
+        })
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
     }
     getUser()
   }, [])
@@ -30,8 +62,6 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-green-50">
-
-      {/* Header */}
       <header className="bg-green-800 text-white px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🌱</span>
@@ -46,12 +76,10 @@ export default function DashboardPage() {
       </header>
 
       <div className="px-4 py-6 space-y-4 max-w-lg mx-auto">
-
-        {/* Welcome */}
         <p className="text-green-900 font-medium">Welcome back 👋</p>
         <p className="text-sm text-gray-500 -mt-2">{user.email}</p>
 
-        {/* Loan Summary Card */}
+        {/* Loan Summary */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Active Loan</h2>
           <div className="flex justify-between items-center mb-2">
@@ -97,20 +125,23 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Alerts */}
+        {/* Alerts — real-time */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Alerts</h2>
-          {[
-            { type: 'warning', message: 'Payment of UGX 700,000 due in 19 days' },
-            { type: 'info', message: 'Your loan was disbursed on 1 Jan 2026' },
-          ].map((a, i) => (
-            <div key={i} className={`flex gap-3 p-3 rounded-lg mb-2 ${a.type === 'warning' ? 'bg-orange-50' : 'bg-blue-50'}`}>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Alerts {alerts.filter(a => !a.is_read).length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                {alerts.filter(a => !a.is_read).length} new
+              </span>
+            )}
+          </h2>
+          {alerts.length === 0 && <p className="text-sm text-gray-400">No alerts yet.</p>}
+          {alerts.map((a) => (
+            <div key={a.id} className={`flex gap-3 p-3 rounded-lg mb-2 ${a.type === 'warning' ? 'bg-orange-50' : 'bg-blue-50'}`}>
               <span>{a.type === 'warning' ? '⚠️' : 'ℹ️'}</span>
               <p className="text-sm text-gray-700">{a.message}</p>
             </div>
           ))}
         </div>
-
       </div>
     </main>
   )

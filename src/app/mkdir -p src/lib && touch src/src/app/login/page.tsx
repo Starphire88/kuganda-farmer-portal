@@ -16,9 +16,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -30,15 +28,11 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-green-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-md w-full max-w-sm p-8">
-
-        {/* Logo area */}
         <div className="text-center mb-8">
           <div className="text-4xl mb-2">🌱</div>
           <h1 className="text-2xl font-bold text-green-800">Kuganda Tech</h1>
           <p className="text-sm text-gray-500 mt-1">Farmer Portal</p>
         </div>
-
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -54,7 +48,6 @@ export default function LoginPage() {
               placeholder="you@example.com"
             />
           </div>
-
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
@@ -69,11 +62,7 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
-
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
